@@ -193,6 +193,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--link);bo
 .as-tell{display:flex;align-items:flex-start;gap:10px;margin:14px 0 0;padding:12px 14px;border:1px solid var(--warn-l);border-radius:12px;background:var(--warn-bg);color:var(--warn);font-size:16px;font-weight:600} .as-tell .i{flex:none;margin-top:1px}
 .as-end .chk-miss{margin-bottom:4px} .as-send{margin-top:14px}
 .as-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)} .as-nav .link{display:inline-flex;align-items:center;gap:6px} .as-left{font-size:14.5px;color:var(--soft)}
+.as-room{height:55vh} .as-in{animation:as-in .22s ease-out} @keyframes as-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}} @media (prefers-reduced-motion:reduce){.as-in{animation:none}}
 .as-end.ok{border-left-color:var(--ok)} .as-end .btn{width:100%}
 .as-entry{display:flex;align-items:center;gap:14px;margin:0 0 16px;padding:14px 18px;border:1px solid var(--chip-bd);border-radius:var(--r);background:var(--teal-bg)}
 .as-entry-t{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0} .as-entry-t strong{font-size:17px;color:var(--title)} .as-entry-t span{font-size:15px;color:var(--soft)}
@@ -298,7 +299,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--link);bo
 .pv-bar{display:flex;align-items:center;gap:10px;padding:10px 16px calc(10px);padding-top:calc(10px + env(safe-area-inset-top,0px));background:var(--card);border-bottom:1px solid var(--line)}
 .pv-bar strong{color:var(--title);font-size:16px} .pv-bar .sp{flex:1}
 .pv-body{flex:1;overflow:auto;padding:16px 12px 40px}
-.pv-pages{width:794px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.pv-frame{margin:0 auto;overflow:hidden} .pv-pages{width:794px;display:flex;flex-direction:column;gap:18px;transform-origin:0 0}
 .sh-page{line-height:1.4;position:relative;width:794px;min-height:1123px;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.3);padding:56px 72px 70px;font-family:"Parisine Office","Parisine","ParisineTT-Regular",Arial,Helvetica,sans-serif;font-size:12.6px;color:#19213A;display:flex;flex-direction:column;gap:9px}
 .sh-logo{width:200px;align-self:center;margin-bottom:6px}
 .sh-title{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #000;border-bottom:1px solid #000;padding:7px 4px}
@@ -776,7 +777,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
    Comptes rendus MOE voie — CRA (MOE-F-63) · CRT à venir
    Saisie sur tablette, données sur l'appareil, sorties : Word V2 officiel rempli, PDF.
    ===================================================================================== */
-const APP_VERSION = '3.10 · 11/10/2026';
+const APP_VERSION = '3.13 · 12/10/2026';
 const KEY = 'moe-f63-v1';
 
 /* ---------- la fiche MOE-F-63 V2 : cases du modèle Word, numérotées dans l'ordre du document ---------- */
@@ -883,10 +884,11 @@ function checked(cr){
   if(cr.avis==='satisfaisant') on.add(55); if(cr.avis==='non') on.add(56);
   return on;
 }
+// nom du fichier : « Compte Rendu des activités-Projet-Date » ; la date d'un jour, ou « Nuit du … au … » (dates en 12-10-2026)
 function fileBase(cr){
-  const f=cr.f, d = f.travType==='nuit' ? f.nuitDu : f.dateJour;
-  const vs=splitList(f.voie), parts=['MOE-F-63 CR activité', f.projet, vs.length?(vs.length>1?'voies ':'voie ')+vs.join('-'):'', fr(d||'').replace(/\//g,'-'), f.numOT?('OT '+f.numOT):''].filter(Boolean);
-  return parts.join(' – ').replace(/[\\/:*?"<>|]+/g,'-').slice(0,140);
+  const f=cr.f, dt=iso=>fr(iso).replace(/\//g,'-');
+  const quand = cr.flag.nuit && f.nuitDu ? `Nuit du ${dt(f.nuitDu)}${f.nuitAu?` au ${dt(f.nuitAu)}`:''}` : cr.flag.jour && f.dateJour ? dt(f.dateJour) : dt(localDay(cr.created));
+  return ['Compte Rendu des activités', f.projet, quand].filter(filled).join('-').replace(/[\\/:*?"<>|]+/g,'-').slice(0,140);
 }
 
 /* ---------- Word : le formulaire V2 officiel, rempli (champs, listes, dates, heures, cases, zones de lignes) ---------- */
@@ -1095,10 +1097,11 @@ function openPreview(cr, onExport){
   const close=el('button',{class:'btn'},'Fermer');
   const bp=exportBtn('PDF','','pdf',async()=>buildPdf(cr),cr,onExport), bw=exportBtn('Word',' btn-primary','docx',()=>buildDocx(cr),cr,onExport);
   bar.append(el('strong',{},'Aperçu de la fiche'), el('span',{class:'sp'}), close, bp, bw);
-  const body=el('div',{class:'pv-body'}); const pages=el('div',{class:'pv-pages', html:sheetHTML(cr)}); body.append(pages);
+  // la fiche (794 px de large) mise à l'échelle de l'écran dans un cadre aux dimensions réduites : centrée, rien ne déborde
+  const body=el('div',{class:'pv-body'}), pages=el('div',{class:'pv-pages', html:sheetHTML(cr)}), frame=el('div',{class:'pv-frame'},[pages]); body.append(frame);
   ov.append(bar, body); document.body.append(ov); fitSheet(pages);
-  const fit=()=>{ const w=body.clientWidth-24, k=Math.min(1.25, w/794); pages.style.transform=`scale(${k})`; pages.style.height=(pages.scrollHeight*k)+'px'; };
-  pages.style.transformOrigin='top center'; requestAnimationFrame(fit); window.addEventListener('resize', fit);
+  const fit=()=>{ const k=Math.min(1.25, (body.clientWidth-24)/794); pages.style.transform=`scale(${k})`; frame.style.width=(794*k)+'px'; frame.style.height=(pages.offsetHeight*k)+'px'; };
+  fit(); requestAnimationFrame(fit); if(document.fonts) document.fonts.ready.then(fit); window.addEventListener('resize', fit);
   ov.close=()=>{ ov.remove(); window.removeEventListener('resize', fit); }; close.addEventListener('click', ov.close);
 }
 /* =====================================================================================
@@ -1886,7 +1889,10 @@ const assistLog = {};
 function stepAssist(app, cr, p, goStep, bar){
   const log=assistLog[cr.id]||(assistLog[cr.id]={ ids:[], force:null }), byId=Object.fromEntries(ASK.map(a=>[a.id,a]));
   const cur=log.force ? byId[log.force] : ASK.find(a=>a.need(cr));
-  const redraw=()=>{ render(); requestAnimationFrame(()=>{ const q=$('.as-q')||$('.as-end'); if(q) q.scrollIntoView({behavior:'smooth', block:'center'}); }); };
+  // la question suivante prend la place exacte de la précédente : l'écran ne remonte ni ne glisse, un léger fondu signale le changement
+  const redraw=()=>{ const old=$('.as-q')||$('.as-end'), y0=old ? old.getBoundingClientRect().top : null; render();
+    const q=$('.as-q')||$('.as-end'); if(!q) return; const steps=$('.steps'), top=(steps ? steps.getBoundingClientRect().bottom : 0)+12;
+    window.scrollTo(0, window.scrollY+q.getBoundingClientRect().top-Math.min(Math.max(y0??top, top), window.innerHeight*0.6)); q.classList.add('as-in'); };
   const answered=id=>{ log.ids=log.ids.filter(x=>x!==id).concat(id); log.force=null; saveSoon(cr); redraw(); };
   const changed=()=>{ saveSoon(cr); bar.paint(); };
   const botIcon=()=>el('span',{class:'as-bot', html:EMBLEM});
@@ -1934,7 +1940,8 @@ function stepAssist(app, cr, p, goStep, bar){
     if(!rest.length) end.append(el('button',{class:'btn btn-primary btn-l as-send', html:`<span>${out.length?'Envoyer quand même':'Vérifier et envoyer'}</span>`+svg('next'), onclick:()=>goStep(3)}));
     app.append(end);
   }
-  app.append(stepFoot(['Avant le chantier',()=>goStep(1)], null));
+  // de la place sous la question : elle peut toujours rester où était la précédente, même quand la page est courte
+  app.append(el('div',{class:'as-room', 'aria-hidden':'true'}), stepFoot(['Avant le chantier',()=>goStep(1)], null));
 }
 
 /* =====================================================================================
