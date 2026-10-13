@@ -230,6 +230,14 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--link);bo
 .qs{display:flex;flex-direction:column}
 .qn{display:grid;grid-template-columns:minmax(0,1.1fr) auto minmax(0,1.5fr);gap:16px;align-items:center;min-height:62px;padding:7px 0;border-top:1px solid var(--line)} .qn:first-child{border-top:0}
 .q-l{display:flex;flex-direction:column;font-weight:600;font-size:16px}
+.q-def{display:block;font-size:13px;font-weight:500;color:var(--soft)} .etat-leg{margin:0 0 8px;font-size:13.5px;color:var(--soft)}
+.cr-date{display:inline-flex;align-items:center;gap:10px;min-height:44px;margin:0 0 0 -4px;padding:0 4px;border:0;border-radius:10px;background:none;font:inherit;color:inherit;letter-spacing:inherit;text-align:left}
+.cr-date:hover{background:var(--hover)} .cr-date .i{flex:none;width:24px;height:24px;color:var(--link)} .cr-date em{font-style:normal;font-size:14px;font-weight:700;color:var(--link)}
+.dlg-date{max-width:540px} .dt-mode{margin:4px 0 0} .dt-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;margin:14px 0 12px;padding:2px}
+.dt-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:58px;padding:8px 14px;border:2px solid var(--line-s);border-radius:12px;background:var(--card);text-align:left}
+.dt-opt strong{font-size:16.5px;color:var(--title)} .dt-opt span{font-size:14px;color:var(--soft)} .dt-opt.best{border-color:var(--teal);background:var(--teal-bg)} .dt-opt.on{border-color:var(--title);box-shadow:inset 0 0 0 1px var(--title)}
+.dt-taken{display:flex;align-items:center;gap:8px;margin:4px 4px 0 !important;font-size:14px;color:var(--warn)} .dt-taken .i{flex:none;width:18px;height:18px} .dt-taken .link{min-height:36px}
+.dt-other{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-bottom:14px;font-size:15px;color:var(--soft)} .dt-other span{flex-basis:100%} .dt-other input{flex:1;min-width:0;height:46px}
 .renvoi{font-size:13px;font-weight:500;font-style:italic;color:var(--soft)} .renvoi.on{color:var(--warn);font-weight:700;font-style:normal}
 .climat{display:grid;grid-template-columns:210px auto minmax(0,1fr);gap:14px 20px;align-items:end}
 .etat{display:flex;flex-direction:column}
@@ -778,7 +786,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
    Comptes rendus MOE voie — CRA (MOE-F-63) · CRT à venir
    Saisie sur tablette, données sur l'appareil, sorties : Word V2 officiel rempli, PDF.
    ===================================================================================== */
-const APP_VERSION = '3.14 · 13/10/2026';
+const APP_VERSION = '3.16 · 13/10/2026';
 const KEY = 'moe-f63-v1';
 
 /* ---------- la fiche MOE-F-63 V2 : cases du modèle Word, numérotées dans l'ordre du document ---------- */
@@ -802,10 +810,12 @@ function el(tag, attrs={}, kids=[]){ const e=document.createElement(tag);
 const fr = iso => { const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[3]}/${m[2]}/${m[1]}`:(iso||''); };
 const today = () => new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 const plusDays = (iso,n) => { const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
-// une nuit saisie après minuit (avant 8 h) est celle qui a commencé la veille
-const nightStart = () => new Date().getHours()<8 ? plusDays(today(),-1) : today();
+// dates de travail par défaut, d'après l'heure de saisie : une nuit saisie avant 16 h est celle qui vient de finir (commencée la veille au soir),
+// après 16 h celle qui commence ce soir ; un jour saisi avant 5 h est celui de la veille
+const nightStart = () => new Date().getHours()<16 ? plusDays(today(),-1) : today();
+const dayStart = () => new Date().getHours()<5 ? plusDays(today(),-1) : today();
 const uid = p => p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.remove('act'); t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'), 2600); }
+function toast(msg, ms=2600){ const t=$('#toast'); t.textContent=msg; t.classList.remove('act'); t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'), ms); }
 // message avec « Annuler » : 10 secondes pour revenir sur une suppression (les données n'existent que sur la tablette)
 function toastUndo(msg, undo){ const t=$('#toast'); t.textContent=''; t.append(el('span',{},msg), el('button',{type:'button', class:'toast-undo', onclick:()=>{ clearTimeout(t._h); t.classList.remove('on','act'); undo(); }},'Annuler'));
   t.classList.add('on','act'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on','act'), 10000); }
@@ -852,7 +862,7 @@ const projOf = cr => store.projects.find(p=>p.id===cr.projectId) || null;
 
 /* ---------- projets ---------- */
 function blankProject(){ return { id:uid('pj'), explicit:true, nom:'', created:Date.now(), updated:Date.now(),
-  f:{unite:'OIT', entite:'EF', numOT:'', reseau:'', ligne:'', lieu:'', commande:'', entreprise:'', travType:''}, flag:{itc:false, sitePropre:false},
+  f:{unite:'OIT', entite:'EF', numOT:'', reseau:'', ligne:'', lieu:'', commande:'', entreprise:'', travType:''}, flag:{itc:false, sitePropre:false, nuitLongue:false},
   voies:[{nom:'V1', type:'principale'}], people:{representant:[], respLot:[], respEntreprise:[], respConsignation:[]}, engins:[], last:null }; }
 // la dernière intervention du projet sert de départ à la suivante
 function rememberLast(cr){ const p=projOf(cr); if(!p) return;
@@ -873,8 +883,10 @@ function newCR(p){
   const vs=p.voies.filter(v=>cr.f.voie.split(', ').includes(v.nom)); cr.flag.voiePrincipale=vs.some(v=>v.type==='principale'); cr.flag.voieSecondaire=vs.some(v=>v.type==='secondaire');
   if(!filled(cr.f.lieu)) cr.f.lieu=f.lieu||'';
   if(cr.f.travType==='nuit'){ const du=nightStart(); cr.flag.nuit=true; cr.f.nuitDu=du; cr.f.nuitAu=plusDays(du,1); }
-  else if(cr.f.travType==='jour'){ cr.flag.jour=true; cr.f.dateJour=today(); }
+  else if(cr.f.travType==='jour'){ cr.flag.jour=true; cr.f.dateJour=dayStart(); }
   store.list.push(cr); store.open=cr.id; save(); go('cr');
+  // entre 5 h et 16 h, la nuit choisie est celle qui vient de finir : on le dit, la date se change d'un toucher
+  const h=new Date().getHours(); if(cr.flag.nuit && h>=5 && h<16) toast(`${crDate(cr)} : la nuit qui vient de finir. Touchez la date pour en choisir une autre.`, 6000);
 }
 function checked(cr){
   const on=new Set();
@@ -901,6 +913,8 @@ function v2Values(cr){
    'obsLorry','obsTrain','obsPPSPS','obsBriefing','obsStopGo','obsAccident','obsIntemperie','reseau','ligne','autresControles', ...V2_ZONES].forEach(k=>{ v[k]=String(f[k]??'').trim(); });
   v.unite = String(f.unite??'').trim() || 'OIT'; v.entite = String(f.entite??'').trim() || 'EF';
   v.temperature = String(f.temperature??'').trim().replace('.',',');
+  // le contrôle des côtes à quai n'a pas de case sur la fiche officielle : il ouvre la ligne « Autres contrôles »
+  v.autresControles = [cr.flag.cotesQuai ? 'Contrôle des côtes à quai' : '', ...splitList(f.autresControles)].filter(Boolean).join(', ');
   ['dateJour','nuitDu','nuitAu'].forEach(k=>{ const on = k==='dateJour' ? cr.flag.jour : cr.flag.nuit; v[k]=on?fr(f[k]):''; v['_iso_'+k]=on?(f[k]||''):''; });   // dates du seul type de travaux coché
   ['heureDebut','heureFin','heureConsignation'].forEach(k=>{ const m=(k==='heureConsignation' && cr.yn.consignation!=='oui') ? null : String(f[k]||'').match(/^(\d{1,2}):(\d{2})/);   /* heure de consignation seulement si « Oui » */ v['hh_'+k]=m?m[1].padStart(2,'0'):''; v['mm_'+k]=m?m[2]:''; });
   ETAT.forEach(([k],i)=>{ v['obsEtat'+(i+1)] = String((cr.etat[k]&&cr.etat[k].obs)||'').trim(); });
@@ -1133,6 +1147,7 @@ const SVG = {
   chev:'<path d="M7 10l5 5 5-5"/>', back:'<path d="M15 6l-6 6 6 6"/>', next:'<path d="M9 6l6 6-6 6"/>', more:'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
   plus:'<path d="M12 5v14M5 12h14"/>', check:'<path d="M5 12.5l4.2 4.2L19 7"/>', x:'<path d="M7 7l10 10M17 7L7 17"/>',
   qr:'<rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h2.5v2.5M20.5 14.5v.01M14.5 20.5h.01M17.5 20.5h3v-3"/>',
+  cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
   ok:'<circle cx="12" cy="12" r="9"/><path d="M8 12.3l2.7 2.7L16 9.6"/>', warn:'<path d="M12 3.8L2.9 19.6h18.2z"/><path d="M12 10v4.2M12 17.2v.1"/>' };
 const svg = (n, cls='i') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVG[n]}</svg>`;
 // dessin d'un formulaire (accueil) : en-tête, champs, cases, tableau
@@ -1157,7 +1172,7 @@ const EMBLEM = '<svg class="emblem" viewBox="0 0 64 64" aria-hidden="true"><rect
 const HOURS=Array.from({length:24},(_,h)=>String(h).padStart(2,'0')), MINUTES=Array.from({length:12},(_,m)=>String(m*5).padStart(2,'0'));
 const LINES_LABEL = (reseau,v) => reseau==='RER'?`RER ${v}`:reseau==='Métro'?`Ligne ${v}`:v;
 const BASE = { unite:['OIT'], entite:['EF'], effectifs:Array.from({length:40},(_,i)=>String(i+1)), temperature:Array.from({length:51},(_,i)=>String(i-10)),
-  engins:['Bourreuse','Pelle rail-route','Régaleuse'] };   // les autres engins s'ajoutent par « Autre engin »
+  engins:['Bourreuse','Pelle rail-route'] };   // les autres engins s'ajoutent par « Autre engin »
 function options(key, obj, p){ let o=[];
   if(p && p.people[key]) o=[...p.people[key]];
   if(key==='ligne') o=[...(LINES_BY_RESEAU[obj.reseau]||[].concat(...Object.values(LINES_BY_RESEAU)))];
@@ -1217,6 +1232,8 @@ function menu(anchor, items){ document.querySelectorAll('.menu').forEach(m=>m.re
 const moreBtn = items => { const b=el('button',{class:'icon', 'aria-label':'Options', html:svg('more')}); b.addEventListener('click',e=>{ e.stopPropagation(); menu(b,items); }); return b; };
 const backLink = (label, fn) => el('button',{class:'back', onclick:fn, html:svg('back')+`<span>${esc(label)}</span>`});
 const tag = (t, cls='') => el('span',{class:'tag '+cls}, t);
+// étiquettes d'un projet : ligne, ITC, nuit longue
+const pTags = p => [lineTag(p), p.flag.itc?tag('ITC','tag-soft'):null, p.flag.nuitLongue?tag('Nuit longue','tag-soft'):null];
 const lineTag = p => p.f.reseau&&p.f.ligne ? tag(`${p.f.reseau==='Métro'?'M':p.f.reseau} ${p.f.ligne}`,'tag-line') : null;
 
 /* ---------- dates ---------- */
@@ -1224,14 +1241,19 @@ const pad = n => String(n).padStart(2,'0');
 const localDay = t => { const d=new Date(t); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const hm = s => filled(s) ? String(s).replace(':',' h ') : '';
 const stamp = t => { const d=new Date(t); return `le ${fr(localDay(t))} à ${pad(d.getHours())} h ${pad(d.getMinutes())}`; };
-const crDate = cr => cr.flag.nuit ? (cr.f.nuitDu?`Nuit du ${fr(cr.f.nuitDu)}`:'Nuit') : cr.flag.jour ? (cr.f.dateJour?fr(cr.f.dateJour):'Jour') : fr(localDay(cr.created));
+// « Nuit du 11 au 12/10/2026 » ; à cheval sur deux mois ou deux années : « Nuit du 31/10 au 01/11/2026 »
+const nightLabel = (du, au) => { const a=fr(du), b=fr(au||plusDays(du,1)); return `Nuit du ${a.slice(6)!==b.slice(6) ? a : a.slice(3,5)!==b.slice(3,5) ? a.slice(0,5) : a.slice(0,2)} au ${b}`; };
+// jour de travail d'un compte rendu (début de la nuit, date du jour, sinon date de création) : les listes se trient dessus
+const workDay = cr => (cr.flag.nuit && cr.f.nuitDu) || (cr.flag.jour && cr.f.dateJour) || localDay(cr.created);
+const byWork = (a, b) => workDay(b).localeCompare(workDay(a)) || b.created-a.created;
+const crDate = cr => cr.flag.nuit ? (cr.f.nuitDu?nightLabel(cr.f.nuitDu, cr.f.nuitAu):'Nuit') : cr.flag.jour ? (cr.f.dateJour?fr(cr.f.dateJour):'Jour') : fr(localDay(cr.created));
 
 /* ---------- la fiche, rubrique par rubrique : ce qui doit être saisi, et le résumé de ce qui l'est ----------
    chaque élément : a = champ où conduire l'agent, l = son nom en clair, g = série (« Après travaux ») */
 const has = k => cr => filled(cr.f[k]), yes = k => cr => !!cr.yn[k];
 const need = (a, l, done, o={}) => ({ a, l, done, when:o.when, g:o.g });
 const ouiNon = v => v==='oui'?'Oui':v==='non'?'Non':'';
-const CTRL = [['devers','Dévers / Gauche'],['ecartement','Écartement de voie'],['travelage','Travelage'],['geometrie','Géométrie'],['barreCourant','Position de la barre de courant'],['ctrlGraisseux','Contrôle d’état graisseux']];
+const CTRL = [['devers','Dévers / Gauche'],['ecartement','Écartement de voie'],['travelage','Travelage'],['geometrie','Géométrie'],['barreCourant','Position de la barre de courant'],['ctrlGraisseux','Contrôle d’état graisseux'],['cotesQuai','Contrôle des côtes à quai']];
 const MAP = [
   { id:'ident', t:'Identification', items:[ need('unite','Unité',has('unite')), need('entite','Entité',has('entite')), need('representant','Représentant MOE',has('representant')), need('projet','Projet',has('projet')),
       need('reseau','Réseau',has('reseau')), need('ligne','Ligne',has('ligne')), need('voie','Voie(s)',has('voie')), need('lieu','Lieu',has('lieu')) ],
@@ -1275,7 +1297,8 @@ const isDone = cr => !!cr.exported && cr.exported >= cr.updated;
 // le soir suivant, le projet propose donc un nouveau compte rendu, même si celui de la veille n'a pas été édité
 function shiftEnd(cr){ const d=cr.flag.nuit?cr.f.nuitAu:cr.flag.jour?cr.f.dateJour:''; if(!d) return cr.created+18*3600e3;
   return new Date(d+'T00:00:00').getTime()+(cr.flag.nuit?14:30)*3600e3; }
-const ongoing = cr => !!cr && !isDone(cr) && Date.now()<shiftEnd(cr);
+// en cours : jusqu'à la fin du poste, ou tant qu'il a été créé il y a moins de 18 h (le compte rendu d'une nuit passée que l'on remplit aujourd'hui)
+const ongoing = cr => !!cr && !isDone(cr) && (Date.now()<shiftEnd(cr) || Date.now()-cr.created<18*3600e3);
 const openCR = cr => { store.open=cr.id; go('cr'); };
 
 /* ---------- guide de première utilisation ----------
@@ -1364,7 +1387,7 @@ const oldBtn = (p, crs, run) => { const todo=crs.filter(c=>!isDone(c) && c!==run
   return el('button',{class:'btn btn-l pc-old', onclick:()=>{ store.openProject=p.id; go('projet'); }},[el('span',{},`Anciens comptes rendus (${crs.length})`), todo?el('span',{class:'pc-todo'},`${todo} à terminer`):null]); };
 function viewCRA(app){
   // le compte rendu en cours d'abord, puis les projets les plus récents
-  const runOf=p=>ongoing(store.list.filter(c=>c.projectId===p.id).sort((a,b)=>b.created-a.created)[0]);
+  const runOf=p=>store.list.some(c=>c.projectId===p.id && ongoing(c));
   const projects=[...store.projects].sort((a,b)=>runOf(b)-runOf(a) || b.updated-a.updated);
   // une fois des projets créés, « Nouveau projet » et « Scanner » passent en boutons discrets : la carte du chantier prend la place
   // en sélection : le nombre choisi, « Tout sélectionner », « Annuler », « Supprimer (n) » à la place des boutons de création
@@ -1383,32 +1406,31 @@ function viewCRA(app){
   if(!projects.length) return;
   if(pickSel) app.append(el('p',{class:'pick-hint'},'Touchez les projets à supprimer : leurs comptes rendus seront effacés avec eux.'));
   const list=el('div',{class:'pcards'});
-  projects.forEach(p=>{ const crs=store.list.filter(c=>c.projectId===p.id).sort((a,b)=>b.created-a.created), last=crs[0], run=ongoing(last);
-    const status = run ? el('div',{class:'pc-run'},[el('p',{class:'pc-st run'},[el('span',{class:'dot'}), el('span',{},[el('strong',{},'Compte rendu en cours'), ` · ${crDate(last)} · étape ${last.step} : ${STEPS_CR[last.step-1].toLowerCase()}`])]),
-        miniSteps(last), el('p',{class:'pc-left'}, runInfo(last))])
+  projects.forEach(p=>{ const crs=store.list.filter(c=>c.projectId===p.id).sort((a,b)=>b.created-a.created), run=crs.filter(ongoing).sort((a,b)=>b.updated-a.updated)[0], last=[...crs].sort(byWork)[0];   // en cours : celui touché en dernier
+    const status = run ? el('div',{class:'pc-run'},[el('p',{class:'pc-st run'},[el('span',{class:'dot'}), el('span',{},[el('strong',{},'Compte rendu en cours'), ` · ${crDate(run)} · étape ${run.step} : ${STEPS_CR[run.step-1].toLowerCase()}`])]),
+        miniSteps(run), el('p',{class:'pc-left'}, runInfo(run))])
       : el('p',{class:'pc-st'}, last ? [el('span',{class:'pc-ic '+(isDone(last)?'ok':'warn'), html:svg(isDone(last)?'ok':'warn')}), `Dernier compte rendu · ${crDate(last)} · ${isDone(last)?'édité':last.exported?'modifié depuis l’édition':'non édité'}`] : 'Aucun compte rendu pour l’instant');
-    const primary = run ? el('button',{class:'btn btn-primary btn-l', html:'<span>Reprendre le compte rendu</span>'+svg('next'), onclick:()=>openCR(last)})
+    const primary = run ? el('button',{class:'btn btn-primary btn-l', html:'<span>Reprendre le compte rendu</span>'+svg('next'), onclick:()=>openCR(run)})
       : el('button',{class:'btn btn-primary btn-l', html:svg('plus')+'<span>Nouveau compte rendu</span>', onclick:()=>startCR(p)});
     // un compte rendu en cours n'empêche pas d'en commencer un autre (autre chantier le même jour, poste suivant…)
     const another = run ? el('button',{class:'btn btn-l pc-new', html:svg('plus')+'<span>Nouveau compte rendu</span>', onclick:()=>startCR(p)}) : null;
     if(pickSel){ const on=pickSel.has(p.id);   // en sélection : la carte entière se coche, sans autre bouton
       list.append(el('article',{class:'pcard pick'+(on?' on':''), role:'checkbox', 'aria-checked':String(on), tabindex:'0', onclick:()=>{ pickSel[on?'delete':'add'](p.id); rerender(); }},[el('span',{class:'pick-ck', html:svg('check')}),
-        el('div',{class:'pc-t'},[el('h2',{},p.nom), lineTag(p), p.flag.itc?tag('ITC','tag-soft'):null]), el('p',{class:'pc-m'},[p.f.lieu, crs.length ? `${crs.length} compte${crs.length>1?'s':''} rendu${crs.length>1?'s':''}` : 'Aucun compte rendu'].filter(Boolean).join(' · '))])); return; }
+        el('div',{class:'pc-t'},[el('h2',{},p.nom), ...pTags(p)]), el('p',{class:'pc-m'},[p.f.lieu, crs.length ? `${crs.length} compte${crs.length>1?'s':''} rendu${crs.length>1?'s':''}` : 'Aucun compte rendu'].filter(Boolean).join(' · '))])); return; }
     list.append(el('article',{class:'pcard'},[
-      el('div',{class:'pc-top'},[el('div',{class:'pc-t'},[el('h2',{},p.nom), lineTag(p), p.flag.itc?tag('ITC','tag-soft'):null]),
+      el('div',{class:'pc-top'},[el('div',{class:'pc-t'},[el('h2',{},p.nom), ...pTags(p)]),
         moreBtn([['Partager par QR code',()=>shareProject(p)], ['Modifier le projet',()=>editProject(p)], ['Supprimer le projet',()=>deleteProject(p),true]])]),
       el('p',{class:'pc-m'},[p.f.lieu, p.voies.map(v=>v.nom).join(', '), p.f.entreprise, p.f.numOT&&`OT ${p.f.numOT}`].filter(Boolean).join(' · ')),
       status,
-      el('div',{class:'pc-a'},[primary, another, crs.length?oldBtn(p, crs, run?last:null):null])])); });
+      el('div',{class:'pc-a'},[primary, another, crs.length?oldBtn(p, crs, run||null):null])])); });
   app.append(list, pickSel ? '' : el('button',{class:'link pj-clean', onclick:()=>{ pickSel=new Set(); rerender(); window.scrollTo(0,0); }},'Supprimer plusieurs projets')); }
 
-/* ---------- nouveau projet : six étapes, validées une à une ---------- */
+/* ---------- nouveau projet : cinq étapes, validées une à une (les engins se saisissent dans les comptes rendus) ---------- */
 const STEPS = [
   { t:'Identité', d:'Nom, OT, commande, rattachement', ok:p=>filled(p.nom)&&filled(p.f.unite)&&filled(p.f.entite) },
   { t:'Localisation', d:'Réseau, ligne, lieu', ok:p=>filled(p.f.reseau)&&filled(p.f.ligne)&&filled(p.f.lieu) },
   { t:'Voies', d:'Nom et type de chaque voie', ok:p=>p.voies.length>0&&p.voies.every(v=>filled(v.nom)) },
   { t:'Intervenants', d:'Entreprise et personnes', ok:p=>filled(p.f.entreprise)&&p.people.representant.length>0 },
-  { t:'Moyens habituels', d:'Engins du chantier', ok:()=>true },
   { t:'Récapitulatif', d:'Vérifier et enregistrer', ok:()=>true } ];
 function viewWizard(app){
   const src=store.projects.find(p=>p.id===store.editProject); const editing=!!src;
@@ -1427,7 +1449,7 @@ function viewWizard(app){
   const railBtns=STEPS.map((s,i)=>{ const n=el('span',{class:'wz-n'}); const b=el('button',{class:'wz-step', onclick:()=>{ commit(); step=i; viewWizard.step=i; tried=false; draw(); }},[n, el('span',{class:'wz-tx'},[el('strong',{},s.t), el('span',{},s.d)])]); b.num=n; return b; });
   rail.append(...railBtns);
   // une étape n'est cochée qu'une fois vue (ou en modification d'un projet existant)
-  const drawRail=()=>railBtns.forEach((b,i)=>{ const ok=STEPS[i].ok(d) && i<5 && (editing || i<=(viewWizard.max||0)), on=i===step; b.classList.toggle('on',on); b.classList.toggle('ok',ok); b.num.innerHTML=ok&&!on?svg('check'):String(i+1); });
+  const drawRail=()=>railBtns.forEach((b,i)=>{ const ok=STEPS[i].ok(d) && i<STEPS.length-1 && (editing || i<=(viewWizard.max||0)), on=i===step; b.classList.toggle('on',on); b.classList.toggle('ok',ok); b.num.innerHTML=ok&&!on?svg('check'):String(i+1); });
   const err=(cond)=> tried && !cond ? 'Obligatoire' : null;
   const content=[
     // 1 — identité
@@ -1438,7 +1460,9 @@ function viewWizard(app){
       return [el('div',{class:'grid'},[field('Réseau', seg([['RER','RER'],['Métro','Métro'],['Tramway','Tramway']],()=>d.f.reseau||'',v=>{ d.f.reseau=v; if(d.f.ligne && !(LINES_BY_RESEAU[v]||[]).includes(d.f.ligne)) d.f.ligne=''; },{on:()=>{ lg.redraw(); drawRail(); }}), {req:true, err:err(filled(d.f.reseau))}),
           field('Ligne', lg, {req:true, err:err(filled(d.f.ligne))}), field('Lieu / Localisation', input(d.f,'lieu',{ph:'Sucy-Bonneuil / Boissy-St-Léger', on:drawRail}), {wide:true, req:true, err:err(filled(d.f.lieu))}),
           field('Interventions habituelles', seg([['jour','De jour'],['nuit','De nuit']],()=>d.f.travType||'',v=>{ d.f.travType=v; }))]),
-        el('div',{class:'cks'},[check('Travaux en ITC',()=>d.flag.itc,v=>{ d.flag.itc=v; }), check('Travaux en site propre',()=>d.flag.sitePropre,v=>{ d.flag.sitePropre=v; })])]; },
+        // nuit longue : interventions de nuit (proposé d'office si rien n'est encore choisi)
+        el('div',{class:'cks'},[check('Travaux en ITC',()=>d.flag.itc,v=>{ d.flag.itc=v; }), check('Travaux en site propre',()=>d.flag.sitePropre,v=>{ d.flag.sitePropre=v; }),
+          check('Nuit longue',()=>d.flag.nuitLongue,v=>{ d.flag.nuitLongue=v; if(v && !d.f.travType) d.f.travType='nuit'; },()=>draw())])]; },
     // 3 — voies
     ()=>{ const box=el('div',{class:'rows'}); const draw3=()=>{ box.innerHTML='';
         d.voies.forEach((v,i)=>{ const nm=el('input',{type:'text', autocomplete:'off', 'aria-label':`Nom de la voie ${i+1}`}); nm.value=v.nom; nm.addEventListener('input',()=>{ v.nom=nm.value.trim(); drawRail(); });
@@ -1459,16 +1483,13 @@ function viewWizard(app){
           list.append(el('div',{class:'addrow'},[inp, el('button',{type:'button', class:'btn', onclick:()=>add(true)},'Ajouter')])); };
         drawP(); blocks.push(field(lab, list, {req:k==='representant', full:true, err:k==='representant'?err(d.people.representant.length>0):null})); });
       return [el('div',{class:'grid'},blocks)]; },
-    // 5 — moyens habituels (les effectifs, variables, se saisissent dans chaque compte rendu)
-    ()=>[field('Engins habituels', multiPick(BASE.engins, ()=>d.engins, v=>{ d.engins=v; }, null, 'Autre engin'), {full:true})],
-    // 6 — récapitulatif
+    // 5 — récapitulatif
     ()=>{ const dl=(i,rows)=>el('div',{class:'recap'},[el('div',{class:'recap-h'},[el('strong',{},STEPS[i].t), el('button',{class:'link', onclick:()=>{ step=i; viewWizard.step=i; draw(); }},'Modifier')]),
         el('dl',{},rows.flatMap(([k,v])=>[el('dt',{},k), el('dd',{},filled(v)?v:'—')]))]);
       return [dl(0,[['Projet',d.nom],['N° d’OT',d.f.numOT],['N° commande',d.f.commande],['Unité / Entité',[d.f.unite,d.f.entite].filter(Boolean).join(' / ')]]),
-        dl(1,[['Réseau / ligne',d.f.reseau&&d.f.ligne?LINES_LABEL(d.f.reseau,d.f.ligne):''],['Lieu',d.f.lieu],['Interventions',d.f.travType==='nuit'?'De nuit':d.f.travType==='jour'?'De jour':''],['ITC / site propre',[d.flag.itc?'ITC':'',d.flag.sitePropre?'Site propre':''].filter(Boolean).join(' · ')||'Non']]),
+        dl(1,[['Réseau / ligne',d.f.reseau&&d.f.ligne?LINES_LABEL(d.f.reseau,d.f.ligne):''],['Lieu',d.f.lieu],['Interventions',d.f.travType==='nuit'?'De nuit':d.f.travType==='jour'?'De jour':''],['Particularités',[d.flag.itc?'ITC':'',d.flag.sitePropre?'Site propre':'',d.flag.nuitLongue?'Nuit longue':''].filter(Boolean).join(' · ')||'Aucune']]),
         dl(2,d.voies.map((v,i)=>[`Voie ${i+1}`,`${v.nom} · ${v.type}`])),
-        dl(3,[['Entreprise',d.f.entreprise],...ROLES.map(([k,l])=>[l,d.people[k].join(', ')])]),
-        dl(4,[['Engins',d.engins.join(', ')]])]; } ];
+        dl(3,[['Entreprise',d.f.entreprise],...ROLES.map(([k,l])=>[l,d.people[k].join(', ')])])]; } ];
   const draw=()=>{ viewWizard.max=Math.max(viewWizard.max||0, step); drawRail(); pane.innerHTML=''; const s=STEPS[step];
     pane.append(el('div',{class:'wz-h'},[el('span',{class:'wz-k'},`Étape ${step+1} sur ${STEPS.length}`), el('h2',{},s.t)]), ...content[step]().filter(Boolean));
     const prev=el('button',{class:'btn btn-l', disabled:step===0, onclick:()=>{ commit(); step--; viewWizard.step=step; tried=false; draw(); }},'Précédent');
@@ -1480,17 +1501,17 @@ function viewWizard(app){
       if(editing) Object.assign(src,out); else store.projects.push(out);
       viewWizard.draft=null; viewWizard.step=0; go('cra'); }}, last?(editing?'Enregistrer':'Créer le projet'):'Suivant');
     pane.append(el('div',{class:'wz-foot'},[prev, next]));
-    if(!editing) later(()=>guide(step===0 ? [['wizard','.wz-rail','Six étapes courtes','Identité, localisation, voies, intervenants, engins, puis un récapitulatif. Les champs marqués * sont obligatoires.']]
+    if(!editing) later(()=>guide(step===0 ? [['wizard','.wz-rail','Cinq étapes courtes','Identité, localisation, voies, intervenants, puis un récapitulatif. Les champs marqués * sont obligatoires.']]
       : last ? [['wzend','.wz-foot .btn-primary','Dernière vérification','Relisez le récapitulatif, puis touchez « Créer le projet ».',true]] : [])); };
   draw(); }
 
 /* ---------- anciens comptes rendus d'un projet : ceux à terminer d'abord, puis ceux qui sont édités ---------- */
 function viewProjet(app){
   const p=store.projects.find(x=>x.id===store.openProject); if(!p) return redirect('cra');
-  app.append(backLink('Mes projets',()=>go('cra')), el('div',{class:'head'},[el('div',{class:'head-t'},[el('h1',{},[p.nom, lineTag(p), p.flag.itc?tag('ITC','tag-soft'):null]), el('p',{},[p.f.lieu, p.voies.map(v=>v.nom).join(', '), p.f.entreprise].filter(Boolean).join(' · '))]),
+  app.append(backLink('Mes projets',()=>go('cra')), el('div',{class:'head'},[el('div',{class:'head-t'},[el('h1',{},[p.nom, ...pTags(p)]), el('p',{},[p.f.lieu, p.voies.map(v=>v.nom).join(', '), p.f.entreprise].filter(Boolean).join(' · '))]),
     el('div',{class:'head-a'},[moreBtn([['Partager par QR code',()=>shareProject(p)],['Modifier le projet',()=>editProject(p)],['Supprimer le projet',()=>deleteProject(p),true]]),
       el('button',{class:'btn btn-primary', html:svg('plus')+'<span>Nouveau compte rendu</span>', onclick:()=>startCR(p)})])]));
-  const list=[...store.list].filter(c=>c.projectId===p.id).sort((a,b)=>b.created-a.created);
+  const list=[...store.list].filter(c=>c.projectId===p.id).sort(byWork);
   if(!list.length){ app.append(el('div',{class:'empty'},[el('p',{},'Aucun compte rendu pour ce projet.')])); return; }
   const row=cr=>{ const st=crState(cr);
     return el('div',{class:'crrow', role:'button', tabindex:'0', onclick:()=>openCR(cr)},[
@@ -1505,9 +1526,14 @@ function viewProjet(app){
 // dans une case d'observation vide, le seul mot « Observations » (jamais imprimé)
 const OBS = 'Observations';
 const OUI_NON=[['oui','Oui'],['non','Non']], NON_OUI=[['non','Non'],['oui','Oui']];
+// sigles expliqués là où on les rencontre en saisissant (RG, RE, RU : définitions de la fiche)
+const DEF = { ppsps:'PPSPS : plan particulier de sécurité et de protection de la santé', ltv:'LTV : limitation temporaire de vitesse', fc:'FC : fiches de contrôle' };
+const RENVOI = { RG:'responsable de groupe', RE:'responsable d’entité', RU:'responsable d’unité' };
+const renvoi = s => String(s||'').replace(/\b(RG|RE|RU)\b/g, m=>`${m} (${RENVOI[m]})`);
+const ETAT_LEG = 'C : conforme · NC : non conforme';
 // une question Oui | Non, suivie de son observation
-function ynRow(cr, label, k, obs, on, o={}){ const y=cr.yn; const i=obs?input(cr.f,obs,{on, memo:true, ph:OBS}):null; const note=o.note?el('span',{class:'renvoi'+(y[k]==='oui'?' on':'')},o.note):null;
-  return el('div',{class:'qn', 'data-k':k},[el('div',{class:'q-l'},[el('span',{},label), note]), seg(o.nonFirst?NON_OUI:OUI_NON,()=>y[k]||'',v=>{ y[k]=v; },{on:v=>{ if(note) note.classList.toggle('on',v==='oui'); if(i && v==='oui' && o.focus && !i.value) i.focus(); on(); }}),
+function ynRow(cr, label, k, obs, on, o={}){ const y=cr.yn; const i=obs?input(cr.f,obs,{on, memo:true, ph:OBS}):null; const note=o.note?el('span',{class:'renvoi'+(y[k]==='oui'?' on':'')},renvoi(o.note)):null;
+  return el('div',{class:'qn', 'data-k':k},[el('div',{class:'q-l'},[el('span',{},label), DEF[k]?el('span',{class:'q-def'},DEF[k]):null, note]), seg(o.nonFirst?NON_OUI:OUI_NON,()=>y[k]||'',v=>{ y[k]=v; },{on:v=>{ if(note) note.classList.toggle('on',v==='oui'); if(i && v==='oui' && o.focus && !i.value) i.focus(); on(); }}),
     el('div',{class:'q-o'},i?[i]:[])]); }
 // raccourci (« Tout conforme »…) : ne remplit que ce qui est vide, et disparaît quand il n'a plus rien à remplir
 function quickFill(label, can, fill, after){ const b=el('button',{type:'button', class:'link', onclick:()=>{ fill(); after(); }},label); b.sync=()=>{ b.hidden=!can(); }; b.sync(); return b; }
@@ -1537,13 +1563,41 @@ function stepper(cr, goStep){ const btns=[], links=[]; const nav=el('nav',{class
     btns.forEach((b,i)=>{ b.classList.toggle('ok',done[i]); b.num.innerHTML=done[i]&&cr.step!==i+1?svg('check'):String(i+1); }); links.forEach((l,i)=>l.classList.toggle('ok',done[i])); };
   nav.paint(); return nav; }
 
+// date du compte rendu : jour ou nuit, et laquelle — les sept derniers jours en un toucher (la plus probable mise en avant), ou une autre date ;
+// une date où le projet a déjà un compte rendu est signalée, avec de quoi l'ouvrir
+const wd = iso => new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long', day:'numeric'});
+const mon = iso => new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{month:'long'});
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+function editDate(cr){ const others=store.list.filter(c=>c.projectId===cr.projectId && c.id!==cr.id);
+  let mode=cr.flag.jour && !cr.flag.nuit ? 'jour' : 'nuit';
+  const ov=el('div',{class:'modal'}), list=el('div',{class:'dt-list'}); ov.close=()=>ov.remove();
+  const taken=iso=>others.find(c=>mode==='nuit' ? c.flag.nuit && c.f.nuitDu===iso : c.flag.jour && c.f.dateJour===iso);
+  const apply=iso=>{ if(mode==='nuit'){ Object.assign(cr.flag,{nuit:true, jour:false}); Object.assign(cr.f,{travType:'nuit', nuitDu:iso, nuitAu:plusDays(iso,1)}); }
+      else { Object.assign(cr.flag,{jour:true, nuit:false}); Object.assign(cr.f,{travType:'jour', dateJour:iso}); }
+    saveSoon(cr); ov.remove(); rerender(); toast(`Date du compte rendu : ${crDate(cr)}.`); };
+  const rel=n=>mode==='nuit' ? (n===0 ? 'ce soir' : n===1 ? (new Date().getHours()<16 ? 'la nuit qui vient de finir' : 'la nuit dernière') : `il y a ${n} nuits`)
+    : (['aujourd’hui','hier','avant-hier'][n] || `il y a ${n} jours`);
+  const label=iso=>{ if(mode==='jour') return cap(`${wd(iso)} ${mon(iso)}`); const au=plusDays(iso,1); return `Nuit du ${wd(iso)}${mon(iso)!==mon(au)?' '+mon(iso):''} au ${wd(au)} ${mon(au)}`; };
+  const draw=()=>{ list.innerHTML=''; const now=mode==='nuit' ? cr.flag.nuit && cr.f.nuitDu : cr.flag.jour && cr.f.dateJour, best=mode==='nuit' ? nightStart() : dayStart();
+    for(let n=0; n<7; n++){ const iso=plusDays(today(),-n), t=taken(iso);
+      list.append(el('div',{class:'dt-row'},[el('button',{type:'button', class:'dt-opt'+(iso===now?' on':'')+(iso===best?' best':''), onclick:()=>apply(iso)},
+          [el('strong',{},label(iso)), el('span',{},[cap(rel(n)), iso===now?'date actuelle':'', iso===best && iso!==now?'la plus probable':''].filter(Boolean).join(' · '))]),
+        t ? el('p',{class:'dt-taken', html:svg('warn')+`<span>Un compte rendu existe déjà pour cette ${mode==='nuit'?'nuit':'date'}.</span>`},[el('button',{type:'button', class:'link', onclick:()=>{ ov.remove(); openCR(t); }},'L’ouvrir')]) : null])); } };
+  const other=el('input',{type:'date', max:today(), 'aria-label':'Autre date'});
+  ov.append(el('div',{class:'dlg dlg-date', role:'dialog', 'aria-modal':'true'},[el('h3',{},'Date du compte rendu'),
+    el('p',{},'Une nuit commence le soir et finit le lendemain matin. Touchez la bonne.'),
+    seg([['jour','Jour'],['nuit','Nuit']],()=>mode,v=>{ mode=v||mode; },{cls:'dt-mode', on:draw}), list,
+    el('div',{class:'dt-other'},[el('span',{},mode==='nuit'?'Autre nuit, commencée le :':'Autre date :'), other, el('button',{type:'button', class:'btn', onclick:()=>{ if(other.value) apply(other.value); }},'Valider')]),
+    el('div',{class:'dlg-row'},[el('button',{type:'button', class:'btn', onclick:ov.close},'Annuler')])]));
+  draw(); document.body.append(ov); }
+
 function viewCR(app){
   const cr=cur(); if(!cr) return redirect('cra'); const p=projOf(cr);
   if(p && !filled(cr.f.lieu) && filled(p.f.lieu)) cr.f.lieu=p.f.lieu;   // lieu ajouté au projet après coup
   const goStep=n=>{ cr.step=n; save(); render(); };
   const bar=stepper(cr, goStep);
   app.append(backLink('Mes projets',()=>go('cra')),
-    el('div',{class:'head head-cr'},[el('div',{class:'head-t'},[el('h1',{},crDate(cr)), el('p',{},[cr.f.projet, p&&p.f.reseau&&p.f.ligne?LINES_LABEL(p.f.reseau,p.f.ligne):''].filter(Boolean).join(' · '))]),
+    el('div',{class:'head head-cr'},[el('div',{class:'head-t'},[el('h1',{},el('button',{type:'button', class:'cr-date', 'aria-label':'Changer la date du compte rendu', html:`<span>${esc(crDate(cr))}</span>`+svg('cal')+'<em>Changer</em>', onclick:()=>editDate(cr)})), el('p',{},[cr.f.projet, p&&p.f.reseau&&p.f.ligne?LINES_LABEL(p.f.reseau,p.f.ligne):''].filter(Boolean).join(' · '))]),
       el('div',{class:'head-a'},[el('button',{class:'btn', onclick:()=>preview(cr)},'Aperçu')])]), bar);
   (cr.step===2 && useAssist(cr) ? stepAssist : [stepStart, stepSheet, stepCheck][cr.step-1])(app, cr, p, goStep, bar); }
 
@@ -1572,12 +1626,13 @@ function stepStart(app, cr, p, goStep, bar){ const f=cr.f, y=cr.yn, marks=[], bl
         seg(OUI_NON,()=>y.consignation||'',v=>{ y.consignation=v; },{on:()=>{ changed(); rerender(); }}),
         consig?field('Heure de consignation', time(f,'heureConsignation',changed)):null, consig?field('Responsable consignation', combo(f,'respConsignation',{project:p, on:changed})):null]), null,
         ()=>y.consignation==='oui' && !filled(f.heureConsignation) ? 'Vous avez répondu « Oui » : indiquez l’heure de consignation.' : ''),
-      block(4,'État des lieux avant travaux',()=>ETAT.every(([k])=>cr.etat[k].avant), el('div',{class:'st-b etat'}, ETAT.map(([k,lab])=>{ const e=cr.etat[k];
-        return el('div',{class:'etat-r one'},[el('span',{class:'etat-l'},lab), seg([['C','C'],['NC','NC']],()=>e.avant||'',v=>{ e.avant=v; },{cls:'cnc', on:changed}), input(e,'obs',{on:changed, ph:OBS})]); })), conforme,
+      block(4,'État des lieux avant travaux',()=>ETAT.every(([k])=>cr.etat[k].avant), el('div',{class:'st-b etat'}, [el('p',{class:'etat-leg'},ETAT_LEG), ...ETAT.map(([k,lab])=>{ const e=cr.etat[k];
+        return el('div',{class:'etat-r one'},[el('span',{class:'etat-l'},lab), seg([['C','C'],['NC','NC']],()=>e.avant||'',v=>{ e.avant=v; },{cls:'cnc', on:changed}), input(e,'obs',{on:changed, ph:OBS})]); })]), conforme,
         ()=>ETAT.some(([k])=>cr.etat[k].avant) ? rest(ETAT.filter(([k])=>!cr.etat[k].avant).map(([,l])=>l), 'Il reste') : '')]),
     stepFoot(null, ['Fin de chantier',()=>goStep(2)], 'Tout est enregistré au fur et à mesure : vous pouvez fermer l’application et revenir en fin de chantier.'));
   marks.forEach(m=>m());
-  later(()=>guide([['steps','.steps','Trois étapes','1 au démarrage du chantier, 2 en fin de chantier, 3 pour vérifier et envoyer. Touchez une étape pour y aller.'],
+  later(()=>guide([['date','.cr-date','La date du compte rendu','Choisie d’après l’heure : une nuit saisie avant 16 h est celle qui vient de finir. Touchez la date pour en choisir une autre.'],
+    ['steps','.steps','Trois étapes','1 au démarrage du chantier, 2 en fin de chantier, 3 pour vérifier et envoyer. Touchez une étape pour y aller.'],
     ['start','.st','Au démarrage','Répondez aux quatre questions : début d’intervention et travaux prévus, plan de prévention / LTV / PPSPS, consignation, état des lieux avant travaux.'],
     ['save','.foot .btn-primary','Tout s’enregistre','Vous pouvez fermer l’application pendant le chantier. En fin de chantier, rouvrez-la : ce compte rendu s’ouvrira directement.']])); }
 
@@ -1623,10 +1678,10 @@ function stepSheet(app, cr, p, goStep, bar){ const f=cr.f, y=cr.yn, fl=cr.flag, 
   const dates = fl.nuit ? [field('Du', input(f,'nuitDu',{type:'date', on:()=>{ if(f.nuitDu){ f.nuitAu=plusDays(f.nuitDu,1); au.value=f.nuitAu; } changed(); }})), field('Au', au)] : fl.jour ? [field('Date', input(f,'dateJour',{type:'date', on:changed}))] : [];
   section('types',[grid([field('Travaux', seg([['jour','Jour'],['nuit','Nuit']],()=>fl.nuit?'nuit':fl.jour?'jour':'',v=>{ fl.jour=v==='jour'; fl.nuit=v==='nuit'; f.travType=v; if(v==='jour'&&!f.dateJour) f.dateJour=today(); if(v==='nuit'&&!f.nuitDu){ f.nuitDu=nightStart(); f.nuitAu=plusDays(f.nuitDu,1); } },{on:()=>{ changed(); rerender(); }}), {req:true, k:'travaux'}), ...dates,
       field('Sous consignation courant', seg(OUI_NON,()=>y.consignation||'',v=>{ y.consignation=v; },{on:()=>{ changed(); rerender(); }}), {req:true, k:'consignation'}), y.consignation==='oui'?field('Heure de consignation', time(f,'heureConsignation',changed), {req:true, k:'heureConsignation'}):null,
-      field('LTV', seg(OUI_NON,()=>y.ltv||'',v=>{ y.ltv=v; },{on:changed}), {req:true, k:'ltv'})]),
+      field(el('span',{},['LTV ', el('span',{class:'q-def'},DEF.ltv)]), seg(OUI_NON,()=>y.ltv||'',v=>{ y.ltv=v; },{on:changed}), {req:true, k:'ltv'})]),
     cks([flagBox('itc','Travaux en ITC'), flagBox('sitePropre','Travaux en site propre'), ...voieFlags])]);
   // Sécurité
-  section('secu',[el('div',{class:'qs'},[q('Plan de prévention / PPSPS','ppsps','obsPPSPS'), q('Briefing','briefing','obsBriefing'), q('STOP&GO','stopgo','obsStopGo',{nonFirst:true, focus:true}), q('Accident','accident','obsAccident',{nonFirst:true, focus:true})])],
+  section('secu',[el('div',{class:'qs'},[q('Plan de prévention / PPSPS','ppsps','obsPPSPS'), q('Briefing','briefing','obsBriefing'), q('STOP&GO','stopgo','obsStopGo',{focus:true}), q('Accident','accident','obsAccident',{focus:true})])],
     quick('Tout conforme', emptyOf(y,{ppsps:'oui',briefing:'oui',stopgo:'non',accident:'non'})));
   // Conditions climatiques
   { const obs=input(f,'obsIntemperie',{on:changed, memo:true, ph:OBS});
@@ -1647,7 +1702,7 @@ function stepSheet(app, cr, p, goStep, bar){ const f=cr.f, y=cr.yn, fl=cr.flag, 
     boxes.push(check('Aucun contrôle réalisé',()=>!!cr.ctrlAucun,v=>{ cr.ctrlAucun=v; if(v){ CTRL.forEach(([k])=>{ fl[k]=false; }); f.autresControles=''; } },()=>{ saveSoon(cr); rerender(); },'ck-none'));
     section('controles',[el('div',{class:'cks', 'data-k':'controles'},boxes), field('Autres contrôles', autresPick(cr, repaint), {full:true}), el('div',{class:'qs'},[q('FC en annexe','fc',null)])]); }
   // État des lieux
-  const et=el('div',{class:'etat'},[el('div',{class:'etat-h'},['','Avant travaux','Après travaux',''].map(x=>el('span',{},x)))]);
+  const et=el('div',{class:'etat'},[el('p',{class:'etat-leg'},ETAT_LEG), el('div',{class:'etat-h'},['','Avant travaux','Après travaux',''].map(x=>el('span',{},x)))]);
   ETAT.forEach(([k,lab])=>{ cr.etat[k]=cr.etat[k]||{}; const e=cr.etat[k]; const cnc=w=>seg([['C','C'],['NC','NC']],()=>e[w]||'',v=>{ e[w]=v; },{cls:'cnc', on:changed});
     et.append(el('div',{class:'etat-r', 'data-k':k},[el('span',{class:'etat-l'},lab), cnc('avant'), cnc('apres'), input(e,'obs',{on:changed, ph:OBS})])); });
   section('etat',[et], quick('Tout conforme',[()=>ETAT.some(([k])=>!cr.etat[k].avant||!cr.etat[k].apres), ()=>ETAT.forEach(([k])=>{ const e=cr.etat[k]; e.avant=e.avant||'C'; e.apres=e.apres||'C'; })]));
@@ -1742,7 +1797,7 @@ const WEATHER = ['Pluie','Pluie forte','Neige','Gel','Vent fort','Brouillard','F
 // une question de sécurité ou de qualité : Oui / Non, rien de proposé d'avance (ni mise en avant, ni « comme d'habitude ») ;
 // la réponse inhabituelle (accident « Oui », briefing « Non »…) demande une observation avant de continuer
 const ynSafe = (k, q, obs, unusual, obsQ, nonFirst=false, note='') => [{ id:k, neutral:true, need:cr=>!cr.yn[k] || (cr.yn[k]===unusual && !filled(cr.f[obs])),
-  q:cr=>cr.yn[k]===unusual && !filled(cr.f[obs]) ? `${q} « ${ouiNon(unusual)} ». ${obsQ}` : q, sub:()=>note,
+  q:cr=>cr.yn[k]===unusual && !filled(cr.f[obs]) ? `${q} « ${ouiNon(unusual)} ». ${obsQ}` : q, sub:()=>[renvoi(note), DEF[k]].filter(Boolean).join(' · '),
   ans:cr=>(nonFirst ? ['non','oui'] : ['oui','non']).map(v=>[ouiNon(v), v===unusual ? null : ()=>{ cr.yn[k]=v; }, false, cr.yn[k]===v]),
   more:{ l:'', auto:cr=>cr.yn[k]===unusual, open:cr=>{ cr.yn[k]=unusual; }, nodes:(cr,p,on)=>[field(obsQ, input(cr.f,obs,{on, memo:true, ph:OBS}), {full:true})], ready:cr=>filled(cr.f[obs]) },
   sum:cr=>[ouiNon(cr.yn[k]), cr.yn[k]===unusual ? cr.f[obs] : ''].filter(Boolean).join(' · ') }];
@@ -1756,7 +1811,7 @@ const ASK = [
   { id:'jourNuit', need:cr=>!(cr.flag.nuit ? filled(cr.f.nuitDu)&&filled(cr.f.nuitAu) : cr.flag.jour && filled(cr.f.dateJour)), q:()=>'Travaux de jour ou de nuit ?',
     ans:cr=>{ const du=nightStart(), h=habit(cr, c=>c.flag.nuit?'nuit':c.flag.jour?'jour':'');
       const o=[[`De nuit · du ${fr(du)} au ${fr(plusDays(du,1))}`, ()=>{ Object.assign(cr.flag,{nuit:true, jour:false}); Object.assign(cr.f,{travType:'nuit', nuitDu:du, nuitAu:plusDays(du,1)}); }, h==='nuit'],
-        [`De jour · ${fr(today())}`, ()=>{ Object.assign(cr.flag,{jour:true, nuit:false}); Object.assign(cr.f,{travType:'jour', dateJour:today()}); }, h==='jour']];
+        [`De jour · ${fr(dayStart())}`, ()=>{ Object.assign(cr.flag,{jour:true, nuit:false}); Object.assign(cr.f,{travType:'jour', dateJour:dayStart()}); }, h==='jour']];
       return h==='jour' ? o.reverse() : o; },
     sum:cr=>cr.flag.nuit ? `De nuit · du ${fr(cr.f.nuitDu)} au ${fr(cr.f.nuitAu)}` : `De jour · ${fr(cr.f.dateJour)}` },
   { id:'voies', need:cr=>!filled(cr.f.voie) && !!projOf(cr) && projOf(cr).voies.length>0, q:()=>'Sur quelle(s) voie(s) avez-vous travaillé ?',
@@ -1809,8 +1864,8 @@ const ASK = [
     sum:cr=>`${cr.f.effectifs} personne${cr.f.effectifs>1?'s':''}` },
   ...ynSafe('ppsps','Le plan de prévention / PPSPS a-t-il été vu ?','obsPPSPS','non','Pourquoi n’a-t-il pas été vu ?'),
   ...ynSafe('briefing','Le briefing a-t-il été fait ?','obsBriefing','non','Pourquoi n’a-t-il pas été fait ?'),
-  ...ynSafe('stopgo','Y a-t-il eu un STOP&GO ?','obsStopGo','oui','Que s’est-il passé ?', true),
-  ...ynSafe('accident','Y a-t-il eu un accident ?','obsAccident','oui','Que s’est-il passé ?', true),
+  ...ynSafe('stopgo','Y a-t-il eu un STOP&GO ?','obsStopGo','oui','Que s’est-il passé ?'),
+  ...ynSafe('accident','Y a-t-il eu un accident ?','obsAccident','oui','Que s’est-il passé ?'),
   { id:'temperature', need:cr=>!filled(cr.f.temperature), q:()=>'Quelle température faisait-il ?', temp:true, sum:cr=>`${cr.f.temperature} °C` },
   { id:'intemperie', need:cr=>!cr.yn.intemperie, q:()=>'Y a-t-il eu des intempéries ?',
     ans:cr=>[['Non, aucune', ()=>{ cr.yn.intemperie='non'; cr.f.obsIntemperie=''; }]],
@@ -1847,7 +1902,7 @@ const ASK = [
   { id:'photos', neutral:true, need:cr=>!cr.yn.photos && !cr.flag.photos, q:()=>'Des photos sont-elles jointes en annexe ?',
     ans:cr=>[['Oui', ()=>{ cr.yn.photos='oui'; cr.flag.photos=true; }], ['Non', ()=>{ cr.yn.photos='non'; cr.flag.photos=false; }]], sum:cr=>cr.flag.photos ? 'Oui' : 'Non' },
   { id:'etat', need:cr=>ETAT.some(([k])=>!(cr.etat[k] && cr.etat[k].avant && cr.etat[k].apres)),
-    q:()=>'État des lieux : pour chaque élément, conforme ou non conforme ?', sub:()=>'Un « NC » demande une observation.',
+    q:()=>'État des lieux : pour chaque élément, conforme ou non conforme ?', sub:()=>`${ETAT_LEG}. Un « NC » demande une observation.`,
     more:{ auto:()=>true, nodes:(cr,p,on)=>[el('div',{class:'etat'},[el('div',{class:'etat-h'},['','Avant travaux','Après travaux',''].map(x=>el('span',{},x))), ...ETAT.map(([k,lab])=>{ const e=cr.etat[k]=cr.etat[k]||{};
         const cnc=w=>seg([['C','C'],['NC','NC']],()=>e[w]||'',v=>{ e[w]=v; },{cls:'cnc', on}); return el('div',{class:'etat-r'},[el('span',{class:'etat-l'},lab), cnc('avant'), cnc('apres'), input(e,'obs',{on, ph:OBS})]); })])],
       ready:cr=>ETAT.every(([k])=>{ const e=cr.etat[k]||{}; return e.avant && e.apres && ((e.avant!=='NC' && e.apres!=='NC') || filled(e.obs)); }) },
@@ -1881,7 +1936,7 @@ function review(cr){ const out=[], add=(c,l,q,k)=>{ if(c) out.push([l,q,k]); }, 
   const n=parseInt(f.effectifs,10); add(filled(f.effectifs) && !(n>0 && n<=80), `Effectifs : ${f.effectifs} personne(s), est-ce juste ?`, 'effectifs');
   const t=parseFloat(String(f.temperature||'').replace(',','.')); add(filled(f.temperature) && !(t>=-20 && t<=45), `Température de ${f.temperature} °C : est-ce juste ?`, 'temperature');
   if(filled(f.heureDebut) && filled(f.heureFin)){ const d=(mins(f.heureFin)-mins(f.heureDebut)+1440)%1440; add(d===0 || d>14*60, `Intervention de ${Math.floor(d/60)} h ${pad(d%60)} : vérifiez les heures`, 'heureFin'); }
-  const tell=[...(y.annules==='oui' || y.aleas==='oui' ? ['votre RG (travaux annulés ou aléas)'] : []), ...(y.impact==='oui' ? ['votre RE et votre RU (impact sur le service)'] : [])];
+  const tell=[...(y.annules==='oui' || y.aleas==='oui' ? ['votre RG, responsable de groupe (travaux annulés ou aléas)'] : []), ...(y.impact==='oui' ? ['votre RE, responsable d’entité, et votre RU, responsable d’unité (impact sur le service)'] : [])];
   return { out, tell }; }
 // un point de la relecture, depuis l'étape 3 : la question de l'assistant, ou le champ de la fiche (rubrique, champ)
 const REVIEW_FICHE = { ppsps:['secu','ppsps'], briefing:['secu','briefing'], stopgo:['secu','stopgo'], accident:['secu','accident'], annules:['horaires','annules'], aleas:['horaires','aleas'],
@@ -1979,7 +2034,7 @@ function cleanProject(d){ if(!d || !txt(d.n)) throw new Error('Ce code ne contie
   const voies=(Array.isArray(d.v)?d.v:[]).filter(v=>v && txt(v.nom)).map(v=>({ nom:txt(v.nom), type:v.type==='secondaire'?'secondaire':'principale' }));
   return { id:txt(d.id)||uid('pj'), nom:txt(d.n),
     f:Object.fromEntries(['unite','entite','numOT','reseau','ligne','lieu','commande','entreprise','travType'].map(k=>[k, txt(f[k])])),
-    flag:{ itc:!!(d.fl&&d.fl.itc), sitePropre:!!(d.fl&&d.fl.sitePropre) },
+    flag:{ itc:!!(d.fl&&d.fl.itc), sitePropre:!!(d.fl&&d.fl.sitePropre), nuitLongue:!!(d.fl&&d.fl.nuitLongue) },
     voies: voies.length ? voies : [{nom:'V1', type:'principale'}],
     people:Object.fromEntries(ROLES.map(([k])=>[k, list(pe[k])])),
     engins:list(d.g).filter(e=>e!=='Draisine') }; }
