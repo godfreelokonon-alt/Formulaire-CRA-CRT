@@ -152,7 +152,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--link);bo
 .ck{display:inline-flex;align-items:center;gap:7px;min-height:48px;padding:0 18px;border:1px solid var(--line-s);border-radius:24px;background:var(--card);font-size:15.5px;font-weight:500;text-align:left;transition:background .15s,border-color .15s,color .15s}
 .ck-ic{display:none;color:var(--teal-d)} .ck-ic .i{width:18px;height:18px;stroke-width:2.8}
 .ck.on{padding-left:13px;border-color:var(--chip-bd);background:var(--chip-bg);color:var(--chip-fg);font-weight:600} .ck.on .ck-ic{display:flex}
-.ck-none{border-style:dashed}
+.ck-or{flex-basis:100%;display:flex;align-items:center;gap:12px;margin:4px 0 0;color:var(--faint);font-size:14px;font-weight:600} .ck-or::after{content:'';flex:1;height:1px;background:var(--line)}
+.ck-none{border-style:dashed;background:var(--card2);color:var(--soft)} .ck-none.on{border-style:solid;border-color:var(--line-s);background:var(--band);color:var(--ink)} .ck-none.on .ck-ic{color:var(--soft)}
 .multi{display:flex;flex-direction:column;gap:10px}
 /* avis final : un grand sélecteur, le choix retenu prend sa couleur */
 .seg-avis{display:flex;width:100%;padding:4px}
@@ -789,7 +790,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
    Comptes rendus MOE voie — CRA (MOE-F-63) · CRT à venir
    Saisie sur tablette, données sur l'appareil, sorties : Word V2 officiel rempli, PDF.
    ===================================================================================== */
-const APP_VERSION = '3.17 · 14/10/2026';
+const APP_VERSION = '3.18 · 14/10/2026';
 const KEY = 'moe-f63-v1';
 
 /* ---------- la fiche MOE-F-63 V2 : cases du modèle Word, numérotées dans l'ordre du document ---------- */
@@ -799,7 +800,7 @@ const NY = { annules:[28,27], aleas:[30,29], impact:[32,31] };           // [Oui
 const FLAG = { jour:7, nuit:8, itc:9, sitePropre:10, voiePrincipale:13, voieSecondaire:14, photos:33,
   devers:34, ecartement:35, travelage:36, geometrie:37, barreCourant:57, ctrlGraisseux:58, nuitLongue:60 };
 const ETAT = [['chem','Cheminements',39],['niches','Niches',43],['plateforme','Plateforme Voie',47],['graisseux','Contrôle état graisseux',51]];
-const ROLES = [['representant','Représentants MOE'],['respLot','Responsables de lot'],['respEntreprise','Responsables entreprise'],['respConsignation','Responsable consignation']];
+const ROLES = [['representant','Représentants MOE'],['respLot','Responsable de lot'],['respEntreprise','Responsable entreprise'],['respConsignation','Responsable consignation']];
 // valeurs d'une intervention reprises pour la suivante (à vérifier par l'agent) ; voie principale / secondaire suivent les voies
 const CARRY = { f:['voie','lieu','respConsignation','respEntreprise','engins'], yn:['lorry','train','agentTrain','ltv'] };
 
@@ -1715,9 +1716,10 @@ function stepSheet(app, cr, p, goStep, bar){ const f=cr.f, y=cr.yn, fl=cr.flag, 
     cks([flagBox('photos','Photos en annexe')])],
     quick('Rien à signaler', emptyOf(y,{annules:'non',aleas:'non',impact:'non'})));
   // Contrôles techniques réalisés : au moins un contrôle coché ou écrit, ou « Aucun contrôle réalisé » ; puis FC en annexe
-  { const boxes=[]; const repaint=()=>{ boxes.forEach(b=>b.paint()); changed(); };
+  { const boxes=[]; const repaint=()=>{ boxes.forEach(b=>b.paint&&b.paint()); changed(); };
     CTRL.forEach(([k,l])=>boxes.push(check(l,()=>fl[k],v=>{ fl[k]=v; if(v) cr.ctrlAucun=false; },repaint)));
-    // « Aucun » vide aussi les autres contrôles : la rubrique est redessinée
+    // « Aucun » vide aussi les autres contrôles : la rubrique est redessinée ; seul sur sa ligne, après « ou », pour ne pas se fondre dans les contrôles
+    boxes.push(el('div',{class:'ck-or', 'aria-hidden':'true'},[el('span',{},'ou')]));
     boxes.push(check('Aucun contrôle réalisé',()=>!!cr.ctrlAucun,v=>{ cr.ctrlAucun=v; if(v){ CTRL.forEach(([k])=>{ fl[k]=false; }); f.autresControles=''; } },()=>{ saveSoon(cr); rerender(); },'ck-none'));
     section('controles',[el('div',{class:'cks', 'data-k':'controles'},boxes), field('Autres contrôles', autresPick(cr, repaint), {full:true}), el('div',{class:'qs'},[q('FC en annexe','fc',null)])]); }
   // État des lieux
