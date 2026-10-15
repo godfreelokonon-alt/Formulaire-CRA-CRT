@@ -790,7 +790,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
    Comptes rendus MOE voie — CRA (MOE-F-63) · CRT à venir
    Saisie sur tablette, données sur l'appareil, sorties : Word V2 officiel rempli, PDF.
    ===================================================================================== */
-const APP_VERSION = '3.18 · 14/10/2026';
+const APP_VERSION = '3.19 · 15/10/2026';
 const KEY = 'moe-f63-v1';
 
 /* ---------- la fiche MOE-F-63 V2 : cases du modèle Word, numérotées dans l'ordre du document ---------- */
@@ -918,8 +918,8 @@ function v2Values(cr){
    'obsLorry','obsTrain','obsPPSPS','obsBriefing','obsStopGo','obsAccident','obsIntemperie','reseau','ligne','autresControles', ...V2_ZONES].forEach(k=>{ v[k]=String(f[k]??'').trim(); });
   v.unite = String(f.unite??'').trim() || 'OIT'; v.entite = String(f.entite??'').trim() || 'EF';   // comme le modèle officiel, y compris la fiche vierge
   v.temperature = String(f.temperature??'').trim().replace('.',',');
-  // le contrôle des côtes à quai n'a pas de case sur la fiche officielle : il ouvre la ligne « Autres contrôles »
-  v.autresControles = [cr.flag.cotesQuai ? 'Contrôle des côtes à quai' : '', ...splitList(f.autresControles)].filter(Boolean).join(', ');
+  // le contrôle des cotes à quai n'a pas de case sur la fiche officielle : il ouvre la ligne « Autres contrôles »
+  v.autresControles = [cr.flag.cotesQuai ? 'Contrôle des cotes à quai' : '', ...splitList(f.autresControles)].filter(Boolean).join(', ');
   ['dateJour','nuitDu','nuitAu'].forEach(k=>{ const on = k==='dateJour' ? cr.flag.jour : cr.flag.nuit; v[k]=on?fr(f[k]):''; v['_iso_'+k]=on?(f[k]||''):''; });   // dates du seul type de travaux coché
   ['heureDebut','heureFin','heureConsignation'].forEach(k=>{ const m=(k==='heureConsignation' && cr.yn.consignation!=='oui') ? null : String(f[k]||'').match(/^(\d{1,2}):(\d{2})/);   /* heure de consignation seulement si « Oui » */ v['hh_'+k]=m?m[1].padStart(2,'0'):''; v['mm_'+k]=m?m[2]:''; });
   ETAT.forEach(([k],i)=>{ v['obsEtat'+(i+1)] = String((cr.etat[k]&&cr.etat[k].obs)||'').trim(); });
@@ -1258,7 +1258,7 @@ const crDate = cr => cr.flag.nuit ? (cr.f.nuitDu?nightLabel(cr.f.nuitDu, cr.f.nu
 const has = k => cr => filled(cr.f[k]), yes = k => cr => !!cr.yn[k];
 const need = (a, l, done, o={}) => ({ a, l, done, when:o.when, g:o.g });
 const ouiNon = v => v==='oui'?'Oui':v==='non'?'Non':'';
-const CTRL = [['devers','Dévers / Gauche'],['ecartement','Écartement de voie'],['travelage','Travelage'],['geometrie','Géométrie'],['barreCourant','Position de la barre de courant'],['ctrlGraisseux','Contrôle d’état graisseux'],['cotesQuai','Contrôle des côtes à quai']];
+const CTRL = [['devers','Dévers / Gauche'],['ecartement','Écartement de voie'],['travelage','Travelage'],['geometrie','Géométrie'],['barreCourant','Position de la barre de courant'],['ctrlGraisseux','Contrôle d’état graisseux'],['cotesQuai','Contrôle des cotes à quai']];
 const MAP = [
   { id:'ident', t:'Identification', items:[ need('unite','Unité',has('unite')), need('entite','Entité',has('entite')), need('representant','Représentant MOE',has('representant')), need('projet','Projet',has('projet')),
       need('reseau','Réseau',has('reseau')), need('ligne','Ligne',has('ligne')), need('voie','Voie(s)',has('voie')), need('lieu','Lieu',has('lieu')) ],
